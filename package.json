@@ -4,6 +4,7 @@
   "description": "replicate an object with scuttlebutt",
   "main": "index.js",
   "dependencies": {
+    "fun-map": "^1.0.0",
     "is-equal": "~0.1.0",
     "scuttlebutt": "~5.6.8"
   },

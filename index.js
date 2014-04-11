@@ -3,6 +3,8 @@ module.exports = Model
 var Scuttlebutt = require('scuttlebutt')
   , inherits = require('util').inherits
   , eq = require('is-equal')
+  , clj = require('fun-map')
+  , assocIn = clj.assocIn
 
 inherits(Model, Scuttlebutt)
 function Model(opts) {
@@ -52,20 +54,6 @@ m.toJSON = function() {
       var update = message[0]
       return assocIn(obj, update[0], update[1])
     }, {})
-}
-
-function assocIn(obj, keys, value) { keys = keys.slice()
-  var key = keys.shift()
-  return keys.length
-    ? assoc(obj, key, assoc(obj[key] || {}, keys, value))
-    : assoc(obj, key, value)
-}
-
-function assoc(obj, key, value) {
-  var ret = {}
-  Object.keys(obj).forEach(function(key) { ret[key] = obj[key] })
-  ret[key] = value
-  return ret
 }
 
 function byTimestamp(a, b) {
