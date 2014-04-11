@@ -15,11 +15,28 @@ function Model(opts) {
 
 var m = Model.prototype
 
+function validUpdate(update) {
+  return Array.isArray(update)
+      && update.length === 2
+      && Array.isArray(update[0])
+      && update[0].length !== 0
+      && update[0].every(function(item) { return typeof item == 'string'
+                                              && item !== '__proto__'
+                                              && item.length !== 0 })
+      && (update[1] === null || typeof update[1] !== 'object')
+}
+
 m._set = function(path, value) {
-  this.localUpdate([path, value])
+  var update = [path, value]
+
+  if (!validUpdate(update)) throw new TypeError('invalid update')
+
+  this.localUpdate(update)
 }
 
 m.applyUpdate = function(message) {
+  if (!validUpdate(message[0])) return false
+
   this._history = this._history
     .concat([message])
     .sort(byTimestamp)
