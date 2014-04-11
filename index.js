@@ -52,9 +52,9 @@ m.delete = function(path) {
   this.localUpdate(update)
 }
 
-m.get = function(path) {
+m.get = function(path, fallback) {
   if (!Array.isArray(path)) path = [path]
-  return getIn(this._JSON(), path)
+  return getIn(this._JSON(), path, fallback)
 }
 
 m.applyUpdate = function(message) {
