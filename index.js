@@ -11,6 +11,7 @@ inherits(Model, Scuttlebutt)
 function Model(opts) {
   if (!this || this === global) return new Model(opts)
   Scuttlebutt.call(this, opts)
+  this._cachedJSON = null
   this._history = []
 }
 
@@ -39,12 +40,13 @@ m.set = function(path, value) {
 
 m.get = function(path) {
   if (!Array.isArray(path)) path = [path]
-  return getIn(this.toJSON(), path)
+  return getIn(this._JSON(), path)
 }
 
 m.applyUpdate = function(message) {
   if (!validUpdate(message[0])) return false
 
+  this._cachedJSON = null
   this._history = this._history
     .concat([message])
     .sort(byTimestamp)
@@ -79,6 +81,10 @@ m.toJSON = function() {
       var update = message[0]
       return assocInM(obj, update[0], update[1])
     }, {})
+}
+
+m._JSON = function() {
+  return this._cachedJSON || (this._cachedJSON = this.toJSON())
 }
 
 function byTimestamp(a, b) {
