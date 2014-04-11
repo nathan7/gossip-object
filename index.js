@@ -4,7 +4,7 @@ var Scuttlebutt = require('scuttlebutt')
   , inherits = require('util').inherits
   , eq = require('is-equal')
   , clj = require('fun-map')
-  , assocIn = clj.assocIn
+  , assocInM = clj.assocInM
 
 inherits(Model, Scuttlebutt)
 function Model(opts) {
@@ -52,7 +52,7 @@ m.toJSON = function() {
   return this._history
     .reduce(function(obj, message) {
       var update = message[0]
-      return assocIn(obj, update[0], update[1])
+      return assocInM(obj, update[0], update[1])
     }, {})
 }
 
