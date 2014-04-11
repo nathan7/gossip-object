@@ -5,6 +5,7 @@ var Scuttlebutt = require('scuttlebutt')
   , eq = require('is-equal')
   , clj = require('fun-map')
   , assocInM = clj.assocInM
+  , getIn = clj.getIn
 
 inherits(Model, Scuttlebutt)
 function Model(opts) {
@@ -26,12 +27,19 @@ function validUpdate(update) {
       && (update[1] === null || typeof update[1] !== 'object')
 }
 
-m._set = function(path, value) {
+m.set = function(path, value) {
+  if (!Array.isArray(path)) path = [path]
+
   var update = [path, value]
 
   if (!validUpdate(update)) throw new TypeError('invalid update')
 
   this.localUpdate(update)
+}
+
+m.get = function(path) {
+  if (!Array.isArray(path)) path = [path]
+  return getIn(this.toJSON(), path)
 }
 
 m.applyUpdate = function(message) {
