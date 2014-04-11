@@ -19,19 +19,33 @@ var m = Model.prototype
 
 function validUpdate(update) {
   return Array.isArray(update)
-      && update.length === 2
+      && update.length >= 1
       && Array.isArray(update[0])
       && update[0].length !== 0
       && update[0].every(function(item) { return typeof item == 'string'
                                               && item !== '__proto__'
                                               && item.length !== 0 })
-      && (update[1] === null || typeof update[1] !== 'object')
+      && (  update.length === 1
+         || (  update.length === 2
+            && (update[1] === null || typeof update[1] !== 'object')
+            )
+         )
 }
 
 m.set = function(path, value) {
   if (!Array.isArray(path)) path = [path]
 
   var update = [path, value]
+
+  if (!validUpdate(update)) throw new TypeError('invalid update')
+
+  this.localUpdate(update)
+}
+
+m.delete = function(path) {
+  if (!Array.isArray(path)) path = [path]
+
+  var update = [path]
 
   if (!validUpdate(update)) throw new TypeError('invalid update')
 

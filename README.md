@@ -22,6 +22,12 @@
 
   get a value, with either a path (an array of keys, diving into recursive objects) or a plain key
 
+
+### model.delete(key)
+### model.delete(path)
+
+  delete a value, with either a path (an array of keys, diving into recursive objects) or a plain key
+
 ### model.toJSON()
 
   get all the data plain JS object
