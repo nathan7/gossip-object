@@ -1,0 +1,30 @@
+{
+  "name": "replicated-object",
+  "version": "0.0.0",
+  "description": "replicate an object with scuttlebutt",
+  "main": "index.js",
+  "dependencies": {
+    "is-equal": "~0.1.0",
+    "scuttlebutt": "~5.6.8"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/vigour-io/replicated-object.git"
+  },
+  "keywords": [
+    "replicate",
+    "object",
+    "distributed",
+    "gossip"
+  ],
+  "author": "Nathan Zadoks",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/vigour-io/replicated-object/issues"
+  },
+  "homepage": "https://github.com/vigour-io/replicated-object"
+}
