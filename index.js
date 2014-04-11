@@ -1,4 +1,4 @@
-'use strict'; //jshint node:true
+'use strict';
 module.exports = Model
 var Scuttlebutt = require('scuttlebutt')
   , inherits = require('util').inherits
