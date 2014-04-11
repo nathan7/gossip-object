@@ -7,6 +7,11 @@
     npm install gossip-object
 
 ## API
+
+```js
+var Model = require('gossip-object')
+```
+
 ### Model()
 ### new Model()
   
