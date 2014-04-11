@@ -37,6 +37,10 @@ var Model = require('gossip-object')
 
   get all the data plain JS object
 
+### model.on('change', function(old))
+
+  get notified when changes happen, you're passed the .toJSON() from before the change so you can tell the difference.
+
 ### model.createStream()
 
   [Scuttlebutt replication](https://github.com/dominictarr/scuttlebutt#replication)

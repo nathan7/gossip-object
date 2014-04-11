@@ -60,6 +60,9 @@ m.get = function(path, fallback) {
 m.applyUpdate = function(message) {
   if (!validUpdate(message[0])) return false
 
+  var changeListeners = this.listeners('change').length !== 0
+  var old = changeListeners && this.toJSON()
+
   this._cache = null
   this._history = this._history
     .concat([message])
@@ -76,6 +79,9 @@ m.applyUpdate = function(message) {
         })
         .concat([freshMessage])
     }, [])
+
+  if (changeListeners)
+    this.emit('change', old)
   
   return true
 }
