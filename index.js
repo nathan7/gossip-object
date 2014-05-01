@@ -68,7 +68,6 @@ m.applyUpdate = function(message) {
     .concat([message])
     .sort(byTimestamp)
     .reduce(function(history, freshMessage) {
-      console.log(freshMessage)
       // freshUpdate = [[a], b]
       // invalidates anything with [[a, ..], b]
       var freshUpdate = freshMessage[0]
