@@ -74,7 +74,7 @@ m.applyUpdate = function(message) {
       return history
         .filter(function(message) {
           var update = message[0]
-          return startsWith(freshUpdate[0], update[0])
+          return !startsWith(freshUpdate[0], update[0])
         })
         .concat([freshMessage])
     }, [])
