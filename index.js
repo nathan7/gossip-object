@@ -103,7 +103,9 @@ m._toJSON = function() {
   return this._history
     .reduce(function(obj, message) {
       var update = message[0]
-      return assocInM(obj, update[0], update[1])
+      return update.length === 1
+        ? obj
+        : assocInM(obj, update[0], update[1])
     }, {})
 }
 
