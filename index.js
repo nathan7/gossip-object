@@ -74,7 +74,7 @@ m.applyUpdate = function(message) {
 
 m.mergeHistory = function(messages) {
   this._history = this._history
-    .concat(messages || [])
+    .concat(messages)
     .sort(byTimestamp)
     .reduce(function(history, freshMessage) {
       // freshUpdate = [[a], b]
