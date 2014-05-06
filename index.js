@@ -64,8 +64,17 @@ m.applyUpdate = function(message) {
   var old = changeListeners && this.toJSON()
 
   this._cache = null
+  this.mergeHistory([message])
+
+  if (changeListeners)
+    this.emit('change', old)
+  
+  return true
+}
+
+m.mergeHistory = function(messages) {
   this._history = this._history
-    .concat([message])
+    .concat(messages || [])
     .sort(byTimestamp)
     .reduce(function(history, freshMessage) {
       // freshUpdate = [[a], b]
@@ -78,12 +87,8 @@ m.applyUpdate = function(message) {
         })
         .concat([freshMessage])
     }, [])
-
-  if (changeListeners)
-    this.emit('change', old)
-  
-  return true
 }
+
 
 m.history = function(sources) {
   return this._history
