@@ -61,7 +61,7 @@ m.applyUpdate = function(message) {
   if (!validUpdate(message[0])) return false
 
   var changeListeners = this.listeners('change').length !== 0
-  var old = changeListeners && this.toJSON()
+    , old = changeListeners && this.toJSON()
 
   this._cache = null
   this.mergeHistory([message])
