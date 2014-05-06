@@ -1,6 +1,6 @@
 {
   "name": "gossip-object",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "replicate an object with scuttlebutt",
   "main": "index.js",
   "dependencies": {
