@@ -77,13 +77,23 @@ m.mergeHistory = function(messages) {
     .concat(messages)
     .sort(byTimestamp)
     .reduce(function(history, freshMessage) {
-      // freshUpdate = [[a], b]
-      // invalidates anything with [[a, ..], b]
+      // freshUpdate = [a, _]
+      // invalidates a previous update
+      // update = [b, _]
+      //
+      // when a = [b, ..]
+      // analogous to an object set wiping out the values below it in the tree
+      // invalidates anything with [[a, ..], _]
+      //
+      // when [a, ..] = b
+      // analogous to a deep object set wiping out the values above it in the tree
+
       var freshUpdate = freshMessage[0]
       return history
         .filter(function(message) {
           var update = message[0]
           return !startsWith(freshUpdate[0], update[0])
+              && !startsWith(update[0], freshUpdate[0])
         })
         .concat([freshMessage])
     }, [])
