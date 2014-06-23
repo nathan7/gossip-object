@@ -17,6 +17,13 @@ function Model(opts) {
 
 var m = Model.prototype
 
+Model.Transaction = Transaction
+function Transaction() {
+  this.updates = []
+}
+
+var t = Transaction.prototype
+
 function validUpdate(update) {
   return Array.isArray(update)
       && update.length >= 1
@@ -32,24 +39,38 @@ function validUpdate(update) {
          )
 }
 
-m.set = function(path, value) {
+function validUpdates(updates) {
+  return Array.isArray(updates)
+      && updates.length >= 1
+      && updates.every(validUpdate)
+}
+
+t.localUpdate = function(updates) {
+  ;[].push.apply(this.updates, updates)
+}
+
+t.execute = function(model) {
+  model.localUpdate(this.updates)
+}
+
+t.set = m.set = function(path, value) {
   if (!Array.isArray(path)) path = [path]
 
   var update = [path, value]
 
   if (!validUpdate(update)) throw new TypeError('invalid update')
 
-  this.localUpdate(update)
+  this.localUpdate([update])
 }
 
-m.delete = function(path) {
+t.delete = m.delete = function(path) {
   if (!Array.isArray(path)) path = [path]
 
   var update = [path]
 
   if (!validUpdate(update)) throw new TypeError('invalid update')
 
-  this.localUpdate(update)
+  this.localUpdate([update])
 }
 
 m.get = function(path, fallback) {
@@ -58,7 +79,7 @@ m.get = function(path, fallback) {
 }
 
 m.applyUpdate = function(message) {
-  if (!validUpdate(message[0])) return false
+  if (!validUpdates(message[0])) return false
 
   var changeListeners = this.listeners('change').length !== 0
     , old = changeListeners && this.toJSON()
@@ -74,7 +95,16 @@ m.applyUpdate = function(message) {
 
 m.mergeHistory = function(messages) {
   this._history = this._history
-    .concat(messages)
+    .concat(messages
+      .map(function(message) {
+        var meta = message.slice(1)
+        meta.push(message)
+        return message[0]
+          .map(function(update) {
+            return [update].concat(meta)
+          })
+      })
+      .reduce(concat))
     .sort(byTimestamp)
     .reduce(function(history, freshMessage) {
       // freshUpdate = [a, _]
@@ -102,6 +132,12 @@ m.mergeHistory = function(messages) {
 
 m.history = function(sources) {
   return this._history
+    .map(function(message) {
+      return message[3]
+    })
+    .filter(function(message, i, messages) {
+      return message !== messages[i - 1]
+    })
     .filter(function(message) {
       var ts = message[1]
         , source = message[2]
@@ -128,3 +164,4 @@ function byTimestamp(a, b) {
 }
 
 function startsWith(prefix, value) { return eq(prefix, value.slice(0, prefix.length)) }
+function concat(a, b) { return [].concat(a).concat(b) }
