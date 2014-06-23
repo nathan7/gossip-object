@@ -17,8 +17,8 @@ function Model(opts) {
 
 var m = Model.prototype
 
-Model.Transaction = Transaction
-function Transaction() {
+function Transaction(model) {
+  this.model = model
   this.updates = []
 }
 
@@ -49,9 +49,11 @@ t.localUpdate = function(updates) {
   ;[].push.apply(this.updates, updates)
 }
 
-t.execute = function(model) {
-  model.localUpdate(this.updates)
+t.execute = function() {
+  this.model.localUpdate(this.updates)
 }
+
+m.transact = function() { return new Transaction(this) }
 
 t.set = m.set = function(path, value) {
   if (!Array.isArray(path)) path = [path]
