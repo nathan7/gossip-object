@@ -123,7 +123,7 @@ m.mergeHistory = function(messages) {
             return [update].concat(meta)
           })
       })
-      .reduce(concat))
+      .reduce(concat, []))
     .sort(byTimestamp)
     .reduce(function(history, freshMessage) {
       // freshUpdate = [a, _]
