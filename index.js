@@ -34,12 +34,17 @@ function validValue(value) {
 
 // change ::= [path]
 //        ||= [path, value]
+//        ||= [path, 'ref', key]
 function validChange(change) {
   return Array.isArray(change)
       && validPath(change[0])
       && (  change.length === 1
          || (  change.length === 2
             && validValue(change[1])
+            )
+         || (  change.length === 3
+            && change[1] === 'ref'
+            && validKey(change[2])
             )
          )
 }
