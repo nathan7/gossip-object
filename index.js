@@ -7,104 +7,114 @@ var Scuttlebutt = require('scuttlebutt')
   , assocInM = clj.assocInM
   , getIn = clj.getIn
 
+// key ::= string of nonzero length, not equal to "__proto__"
+function validKey(key) {
+  return typeof key == 'string'
+      && key.length !== 0
+      && key !== '__proto__'
+}
+
+// path ::= [key]
+//      ||= [key, ..path]
+function validPath(path) {
+  return Array.isArray(path)
+      && path.length !== 0
+      && path.every(validKey)
+}
+
+// value ::= undefined
+//       ||= null
+//       ||= boolean
+//       ||= number
+//       ||= string
+function validValue(value) {
+  return value === null
+      || typeof value != 'object'
+}
+
+// change ::= [path]
+//        ||= [path, value]
+function validChange(change) {
+  return Array.isArray(change)
+      && validPath(change[0])
+      && (  change.length === 1
+         || (  change.length === 2
+            && validValue(change[1])
+            )
+         )
+}
+
+// transaction ::= [change]
+//             ||= [change, ..transaction]
+function validTransaction(transaction) {
+  return Array.isArray(transaction)
+      && transaction.length !== 0
+      && transaction.every(validChange)
+}
+
+// update ::= [transaction, timestamp, node-id]
+function validUpdate(update) {
+  return Array.isArray(update)
+      && validTransaction(update[0])
+}
+
 inherits(Model, Scuttlebutt)
 function Model(opts) {
   if (!this || this === global) return new Model(opts)
   Scuttlebutt.call(this, opts)
   this._cache = null
-  this._history = []
+  this._changes = []
   this._deref = (opts && typeof opts.deref == 'function')
     ? opts.deref
     : null
 }
 
-var m = Model.prototype
-
 function Transaction(model) {
   this.model = model
-  this.updates = []
+  this.transaction = []
 }
 
-var t = Transaction.prototype
+var m = Model.prototype
+  , t = Transaction.prototype
 
-function validUpdate(update) {
-  return Array.isArray(update)
-      && update.length >= 1
-      && Array.isArray(update[0])
-      && update[0].length !== 0
-      && update[0].every(function(item) { return typeof item == 'string'
-                                              && item !== '__proto__'
-                                              && item.length !== 0 })
-      && (  update.length === 1
-         || (  update.length === 2
-            && (update[1] === null || typeof update[1] !== 'object')
-            )
-         || (  update.length === 3
-            && update[1] === 'ref'
-            && typeof update[2] == 'string'
-            )
-         )
-}
-
-function validUpdates(updates) {
-  return Array.isArray(updates)
-      && updates.length >= 1
-      && updates.every(validUpdate)
-}
-
-t.localUpdate = function(updates) {
-  ;[].push.apply(this.updates, updates)
-}
-
-t.execute = function() {
-  this.model.localUpdate(this.updates)
-}
-
+t.localUpdate = function(transaction) { Array.prototype.push.apply(this.transaction, transaction) }
+t.execute = function() { this.model.localUpdate(this.transaction) }
 m.transact = function() { return new Transaction(this) }
 
 t.set = m.set = function(path, value) {
-  if (!Array.isArray(path)) path = [path]
-
-  var update = [path, value]
-
-  if (!validUpdate(update)) throw new TypeError('invalid update')
-
-  this.localUpdate([update])
+  if (typeof path == 'string') path = [path]
+  var change = [path, value]
+  if (!validChange(change)) throw new TypeError('invalid change')
+  this.localUpdate([change])
 }
 
 t.ref = m.ref = function(path, value) {
-  if (!Array.isArray(path)) path = [path]
-
-  var update = [path, 'ref', value]
-
-  if (!validUpdate(update)) throw new TypeError('invalid update')
-
-  this.localUpdate([update])
+  if (typeof path == 'string') path = [path]
+  var change = [path, 'ref', value]
+  if (!validChange(change)) throw new TypeError('invalid change')
+  this.localUpdate([change])
 }
 
 t.delete = m.delete = function(path) {
-  if (!Array.isArray(path)) path = [path]
-
-  var update = [path]
-
-  if (!validUpdate(update)) throw new TypeError('invalid update')
-
-  this.localUpdate([update])
+  if (typeof path == 'string') path = [path]
+  var change = [path]
+  if (!validChange(change)) throw new TypeError('invalid change')
+  this.localUpdate([change])
 }
 
 m.get = function(path, fallback) {
-  if (!Array.isArray(path)) path = [path]
+  if (typeof path == 'string') path = [path]
   return getIn(this.toJSON(), path, fallback)
 }
 
-m.applyUpdate = function(message) {
-  if (!validUpdates(message[0])) return false
+m.applyUpdate = function(update) {
+  if (!validUpdate(update)) return false
 
   var changeListeners = this.listeners('change').length !== 0
     , old = changeListeners && this.toJSON()
 
   this._cache = null
-  this.mergeHistory([message])
+  this.mergeHistory([update])
 
   if (changeListeners)
     this.emit('change', old)
@@ -112,23 +122,21 @@ m.applyUpdate = function(message) {
   return true
 }
 
-m.mergeHistory = function(messages) {
-  this._history = this._history
-    .concat(messages
-      .map(function(message) {
-        var meta = message.slice(1)
-        meta.push(message)
-        return message[0]
-          .map(function(update) {
-            return [update].concat(meta)
-          })
-      })
-      .reduce(concat, []))
-    .sort(byTimestamp)
-    .reduce(function(history, freshMessage) {
-      // freshUpdate = [a, _]
+m.mergeHistory = function(updates) { var self = this
+  updates.forEach(function(update) {
+    var transaction = update[0]
+    for (var i = 0, len = transaction.length; i < len; i++)
+      transaction[i].update = update
+
+    ;[].push.apply(self._changes, transaction)
+  })
+
+  this._changes = this._changes
+    .sort(function(a, b) { return byTimestamp(a.update, b.update) })
+    .reduce(function(changes, freshChange) {
+      // freshChange = [a, _]
       // invalidates a previous update
-      // update = [b, _]
+      // change = [b, _]
       //
       // when a = [b, ..]
       // analogous to an object set wiping out the values below it in the tree
@@ -137,43 +145,38 @@ m.mergeHistory = function(messages) {
       // when [a, ..] = b
       // analogous to a deep object set wiping out the values above it in the tree
 
-      var freshUpdate = freshMessage[0]
-      return history
-        .filter(function(message) {
-          var update = message[0]
-          return !startsWith(freshUpdate[0], update[0])
-              && !startsWith(update[0], freshUpdate[0])
+      changes = changes
+        .filter(function(change) {
+          return !startsWith(freshChange[0], change[0])
+              && !startsWith(change[0], freshChange[0])
         })
-        .concat([freshMessage])
+
+      changes.push(freshChange)
+      return changes
     }, [])
 }
 
 
 m.history = function(sources) {
-  return this._history
-    .map(function(message) {
-      return message[3]
-    })
-    .filter(function(message, i, messages) {
-      return message !== messages[i - 1]
-    })
-    .filter(function(message) {
-      var ts = message[1]
-        , source = message[2]
+  return this._changes
+    .map(function(change) { return change.update })
+    .filter(function(update, i, updates) { return update !== updates[i - 1] })
+    .filter(function(update) {
+      var ts = update[1]
+        , source = update[2]
       return (!sources || !sources[source] || sources[source] < ts)
     })
 }
 
 m._toJSON = function() { var self = this
-  return this._history
-    .reduce(function(obj, message) {
-      var update = message[0]
-      return update.length === 1
+  return this._changes
+    .reduce(function(obj, change) {
+      return change.length === 1
         ? obj
-        : (update.length === 2
-          ? assocInM(obj, update[0], update[1])
+        : (change.length === 2
+          ? assocInM(obj, change[0], change[1])
           : (self._deref
-            ? assocInM(obj, update[0], self._deref(update[2]))
+            ? assocInM(obj, change[0], self._deref(change[2]))
             : obj))
     }, {})
 }
@@ -182,9 +185,6 @@ m.toJSON = function() {
   return this._cache || (this._cache = this._toJSON())
 }
 
-function byTimestamp(a, b) {
-  return a[1] - b[1] || (a[2] > b[2] ? 1 : -1)
-}
-
+function byTimestamp(a, b) { return a[1] - b[1] || (a[2] > b[2] ? 1 : -1) }
 function startsWith(prefix, value) { return eq(prefix, value.slice(0, prefix.length)) }
 function concat(a, b) { return [].concat(a).concat(b) }
