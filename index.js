@@ -13,6 +13,9 @@ function Model(opts) {
   Scuttlebutt.call(this, opts)
   this._cache = null
   this._history = []
+  this._deref = (opts && typeof opts.deref == 'function')
+    ? opts.deref
+    : null
 }
 
 var m = Model.prototype
@@ -35,6 +38,10 @@ function validUpdate(update) {
       && (  update.length === 1
          || (  update.length === 2
             && (update[1] === null || typeof update[1] !== 'object')
+            )
+         || (  update.length === 3
+            && update[1] === 'ref'
+            && typeof update[2] == 'string'
             )
          )
 }
@@ -59,6 +66,16 @@ t.set = m.set = function(path, value) {
   if (!Array.isArray(path)) path = [path]
 
   var update = [path, value]
+
+  if (!validUpdate(update)) throw new TypeError('invalid update')
+
+  this.localUpdate([update])
+}
+
+t.ref = m.ref = function(path, value) {
+  if (!Array.isArray(path)) path = [path]
+
+  var update = [path, 'ref', value]
 
   if (!validUpdate(update)) throw new TypeError('invalid update')
 
@@ -147,13 +164,17 @@ m.history = function(sources) {
     })
 }
 
-m._toJSON = function() {
+m._toJSON = function() { var self = this
   return this._history
     .reduce(function(obj, message) {
       var update = message[0]
       return update.length === 1
         ? obj
-        : assocInM(obj, update[0], update[1])
+        : (update.length === 2
+          ? assocInM(obj, update[0], update[1])
+          : (self._deref
+            ? assocInM(obj, update[0], self._deref(update[2]))
+            : obj))
     }, {})
 }
 
