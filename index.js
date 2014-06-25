@@ -2,7 +2,6 @@
 module.exports = Model
 var Scuttlebutt = require('scuttlebutt')
   , inherits = require('util').inherits
-  , eq = require('is-equal')
   , clj = require('fun-map')
   , assocInM = clj.assocInM
   , getIn = clj.getIn
@@ -191,5 +190,11 @@ m.toJSON = function() {
 }
 
 function byTimestamp(a, b) { return a[1] - b[1] || (a[2] > b[2] ? 1 : -1) }
-function startsWith(prefix, value) { return eq(prefix, value.slice(0, prefix.length)) }
 function concat(a, b) { return [].concat(a).concat(b) }
+
+function startsWith(prefix, value) {
+  for (var i = 0, len = prefix.length; i < len; i++)
+    if (prefix[i] !== value[i])
+      return false
+  return true
+}
