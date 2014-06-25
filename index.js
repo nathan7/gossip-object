@@ -6,71 +6,12 @@ var Scuttlebutt = require('scuttlebutt')
   , assocInM = clj.assocInM
   , getIn = clj.getIn
 
-// key ::= string of nonzero length, not equal to "__proto__"
-function validKey(key) {
-  return typeof key == 'string'
-      && key.length !== 0
-      && key !== '__proto__'
-}
-
-// path ::= [key]
-//      ||= [key, ..path]
-function validPath(path) {
-  return Array.isArray(path)
-      && path.length !== 0
-      && path.every(validKey)
-}
-
-// value ::= undefined
-//       ||= null
-//       ||= boolean
-//       ||= number
-//       ||= string
-function validValue(value) {
-  return value === null
-      || typeof value != 'object'
-}
-
-// change ::= [path]
-//        ||= [path, value]
-//        ||= [path, 'ref', key]
-function validChange(change) {
-  return Array.isArray(change)
-      && validPath(change[0])
-      && (  change.length === 1
-         || (  change.length === 2
-            && validValue(change[1])
-            )
-         || (  change.length === 3
-            && change[1] === 'ref'
-            && validKey(change[2])
-            )
-         )
-}
-
-// transaction ::= [change]
-//             ||= [change, ..transaction]
-function validTransaction(transaction) {
-  return Array.isArray(transaction)
-      && transaction.length !== 0
-      && transaction.every(validChange)
-}
-
-// update ::= [transaction, timestamp, node-id]
-function validUpdate(update) {
-  return Array.isArray(update)
-      && validTransaction(update[0])
-}
-
 inherits(Model, Scuttlebutt)
 function Model(opts) {
   if (!this || this === global) return new Model(opts)
   Scuttlebutt.call(this, opts)
   this._cache = null
   this._changes = []
-  this._deref = (opts && typeof opts.deref == 'function')
-    ? opts.deref
-    : null
 }
 
 function Transaction(model) {
@@ -81,29 +22,94 @@ function Transaction(model) {
 var m = Model.prototype
   , t = Transaction.prototype
 
-t.localUpdate = function(transaction) { Array.prototype.push.apply(this.transaction, transaction) }
+// key ::= string of nonzero length, not equal to "__proto__"
+m._validKey = function(key) {
+  return typeof key == 'string'
+      && key.length !== 0
+      && key !== '__proto__'
+}
+
+// path ::= [key]
+//      ||= [key, ..path]
+m._validPath = function(path) {
+  return Array.isArray(path)
+      && path.length !== 0
+      && path.every(this._validKey, this)
+}
+
+// value ::= undefined
+//       ||= null
+//       ||= boolean
+//       ||= number
+//       ||= string
+m._validValue = function(value) {
+  return value === null
+      || typeof value != 'object'
+}
+
+// ref is an empty set — it is defined by subclasses, if they support references
+m._validRef = function(ref) {
+  return false
+}
+
+// change ::= [path]
+//        ||= [path, value]
+//        ||= [path, 'ref', key]
+m._validChange = function validChange(change) {
+  return Array.isArray(change)
+      && this._validPath(change[0])
+      && (  change.length === 1
+         || (  change.length === 2
+            && this._validValue(change[1])
+            )
+         || (  change.length === 3
+            && change[1] === 'ref'
+            && this._validKey(change[2])
+            && this._validRef(change[3])
+            )
+         )
+}
+
+// transaction ::= [change]
+//             ||= [change, ..transaction]
+m._validTransaction = function(transaction) {
+  return Array.isArray(transaction)
+      && transaction.length !== 0
+      && transaction.every(this._validChange, this)
+}
+
+// update ::= [transaction, timestamp, node-id]
+m._validUpdate = function(update) {
+  return Array.isArray(update)
+      && this._validTransaction(update[0])
+}
+
 t.execute = function() { this.model.localUpdate(this.transaction) }
 m.transact = function() { return new Transaction(this) }
 
+t.localChange = function(change) {
+  if (!this.model._validChange(change)) throw new TypeError('invalid change')
+  this.transaction.push(change)
+}
+
+m.localChange = function(change) {
+  if (!this._validChange(change)) throw new TypeError('invalid change')
+  this.localUpdate([change])
+}
+
 t.set = m.set = function(path, value) {
   if (typeof path == 'string') path = [path]
-  var change = [path, value]
-  if (!validChange(change)) throw new TypeError('invalid change')
-  this.localUpdate([change])
+  this.localChange([path, value])
 }
 
 t.ref = m.ref = function(path, value) {
   if (typeof path == 'string') path = [path]
-  var change = [path, 'ref', value]
-  if (!validChange(change)) throw new TypeError('invalid change')
-  this.localUpdate([change])
+  this.localChange([path, 'ref', value])
 }
 
 t.delete = m.delete = function(path) {
   if (typeof path == 'string') path = [path]
-  var change = [path]
-  if (!validChange(change)) throw new TypeError('invalid change')
-  this.localUpdate([change])
+  this.localChange([path])
 }
 
 m.get = function(path, fallback) {
@@ -112,7 +118,7 @@ m.get = function(path, fallback) {
 }
 
 m.applyUpdate = function(update) {
-  if (!validUpdate(update)) return false
+  if (!this._validUpdate(update)) return false
 
   var changeListeners = this.listeners('change').length !== 0
     , old = changeListeners && this.toJSON()
@@ -177,11 +183,9 @@ m._toJSON = function() { var self = this
     .reduce(function(obj, change) {
       return change.length === 1
         ? obj
-        : (change.length === 2
+        : change.length === 2
           ? assocInM(obj, change[0], change[1])
-          : (self._deref
-            ? assocInM(obj, change[0], self._deref(change[2]))
-            : obj))
+          : assocInM(obj, change[0], self._deref(change[2]))
     }, {})
 }
 
