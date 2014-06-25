@@ -64,8 +64,7 @@ m._validChange = function validChange(change) {
             )
          || (  change.length === 3
             && change[1] === 'ref'
-            && this._validKey(change[2])
-            && this._validRef(change[3])
+            && this._validRef(change[2])
             )
          )
 }
