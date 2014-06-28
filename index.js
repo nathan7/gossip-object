@@ -127,7 +127,7 @@ m.applyUpdate = function(update) {
 
   if (changeListeners)
     this.emit('change', old)
-  
+
   return true
 }
 
