@@ -11,7 +11,7 @@ function Model(opts) {
   if (!this || this === global) return new Model(opts)
   Scuttlebutt.call(this, opts)
   this._cache = null
-  this._changes = []
+  this._transactions = []
 }
 
 function Transaction(model) {
@@ -134,42 +134,89 @@ m.applyUpdate = function(update) {
 m.mergeHistory = function(updates) { var self = this
   updates.forEach(function(update) {
     var transaction = update[0]
-    for (var i = 0, len = transaction.length; i < len; i++)
-      transaction[i].update = update
+      , transaction$
+      , change
+      , change$
+      , change$len
+      , freshTransaction
+      , freshTransaction$
+      , freshTransaction$len
+      , freshChange
+      , freshChange$
+      , freshChange$len
 
-    ;[].push.apply(self._changes, transaction)
+    // let's not get into weird places with mutable state
+    transaction = transaction.slice()
+    // show off where we're from
+    transaction.update = update
+
+    // now let's figure out where to live
+    var index = binarySearch(self._transactions, byUpdateTimestamp, transaction)
+    // if there isn't already someone taking that
+    if (index === undefined) return
+
+    // and see if nobody has obsoleted us yet
+    for (freshTransaction$ = index, freshTransaction$len = self._transactions.length; freshTransaction$ < freshTransaction$len; freshTransaction$++) {
+      freshTransaction = self._transactions[freshTransaction$]
+      for (freshChange$ = 0, freshChange$len = freshTransaction.length; freshChange$ < freshChange$len; freshChange$++) {
+        freshChange = freshTransaction[freshChange$]
+        for (change$ = 0, change$len = transaction.length; change$ < change$len; change$++) {
+          change = transaction[change$]
+          if (invalidates(change, freshChange)) {
+            if (--change$len !== 0)
+              transaction.splice(change$--, 1)
+            else
+              return
+          }
+        }
+      }
+    }
+
+    // well, apparently we're still relevant
+    self._transactions.splice(index, 0, transaction)
+    freshTransaction = transaction
+
+    // now let's get rid of any updates we supersede
+    processing: for (transaction$ = index - 1; transaction$ >= 0; transaction$--) {
+      transaction = self._transactions[transaction$]
+      for (freshChange$ = freshTransaction.length - 1; freshChange$ >= 0; freshChange$--) {
+        freshChange = freshTransaction[freshChange$]
+        for (change$ = transaction.length - 1; change$ >= 0; change$--) {
+          change = transaction[change$]
+          if (invalidates(change, freshChange)) {
+            if (transaction.length > 1)
+              transaction.splice(change$, 1)
+            else {
+              self._transactions.splice(transaction$, 1)
+              continue processing
+            }
+          }
+        }
+      }
+    }
   })
+}
 
-  this._changes = this._changes
-    .sort(function(a, b) { return byTimestamp(a.update, b.update) })
-    .reduce(function(changes, freshChange) {
-      // freshChange = [a, _]
-      // invalidates a previous update
-      // change = [b, _]
-      //
-      // when a = [b, ..]
-      // analogous to an object set wiping out the values below it in the tree
-      // invalidates anything with [[a, ..], _]
-      //
-      // when [a, ..] = b
-      // analogous to a deep object set wiping out the values above it in the tree
+function invalidates(change, freshChange) {
+  // freshChange = [a, _]
+  // invalidates a previous update
+  // change = [b, _]
+  //
+  // when a = [b, ..]
+  // analogous to an object set wiping out the values below it in the tree
+  // invalidates anything with [[a, ..], _]
+  //
+  // when [a, ..] = b
+  // analogous to a deep object set wiping out the values above it in the tree
 
-      changes = changes
-        .filter(function(change) {
-          return !startsWith(freshChange[0], change[0])
-              && !startsWith(change[0], freshChange[0])
-        })
-
-      changes.push(freshChange)
-      return changes
-    }, [])
+  return startsWith(freshChange[0], change[0])
+      || startsWith(change[0], freshChange[0])
 }
 
 
 m.history = function(sources) {
-  return this._changes
-    .map(function(change) { return change.update })
-    .filter(function(update, i, updates) { return update !== updates[i - 1] })
+  return this._transactions
+    .map(function(transaction) { return transaction.update })
     .filter(function(update) {
       var ts = update[1]
         , source = update[2]
@@ -178,13 +225,15 @@ m.history = function(sources) {
 }
 
 m._toJSON = function() { var self = this
-  return this._changes
-    .reduce(function(obj, change) {
-      return change.length === 1
-        ? obj
-        : change.length === 2
-          ? assocInM(obj, change[0], change[1])
-          : assocInM(obj, change[0], self._deref(change[2]))
+  return this._transactions
+    .reduce(function(obj, transaction) {
+      return transaction.reduce(function(obj, change) {
+        return change.length === 1
+          ? obj
+          : change.length === 2
+            ? assocInM(obj, change[0], change[1])
+            : assocInM(obj, change[0], self._deref(change[2]))
+      }, obj)
     }, {})
 }
 
@@ -192,12 +241,35 @@ m.toJSON = function() {
   return this._cache || (this._cache = this._toJSON())
 }
 
+function byUpdateTimestamp(a, b) { return byTimestamp(a.update, b.update) }
 function byTimestamp(a, b) { return a[1] - b[1] || (a[2] > b[2] ? 1 : -1) }
-function concat(a, b) { return [].concat(a).concat(b) }
 
 function startsWith(prefix, value) {
   for (var i = 0, len = prefix.length; i < len; i++)
     if (prefix[i] !== value[i])
       return false
   return true
+}
+
+function binarySearch(arr, by, value) {
+  var imin = 0
+    , imax = arr.length
+    , cmp = 1
+
+  while (imin < imax) {
+    var imid = imin + (imax - imin >> 1)
+    cmp = by(arr[imid], value)
+
+    if (cmp < 0)
+      imin = imid + 1
+    else if (cmp > 0)
+      imax = imid
+    else
+      break
+  }
+
+  if (cmp < 0)
+    return imax
+  else if (cmp > 0)
+    return imin
 }
