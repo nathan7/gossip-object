@@ -152,6 +152,10 @@ m.applyUpdate = function(update) {
   // if there isn't already someone taking that
   if (index < 0) return false
 
+  var dropped
+  if (this.listeners('update').length !== 0)
+    dropped = []
+
   // and see if nobody has obsoleted us yet
   for (freshTransaction$ = index, freshTransaction$len = this._transactions.length; freshTransaction$ < freshTransaction$len; freshTransaction$++) {
     freshTransaction = this._transactions[freshTransaction$]
@@ -182,6 +186,8 @@ m.applyUpdate = function(update) {
       for (change$ = transaction.length - 1; change$ >= 0; change$--) {
         change = transaction[change$]
         if (invalidates(change, freshChange)) {
+          if (dropped)
+            dropped.push(transaction)
           if (transaction.length > 1)
             transaction.splice(change$, 1)
           else {
@@ -191,6 +197,12 @@ m.applyUpdate = function(update) {
         }
       }
     }
+  }
+
+  if (dropped) {
+    var added = transaction.slice()
+    added.update = update
+    this.emit('update', { added: transaction, dropped: dropped })
   }
 
   if (changeListeners)
