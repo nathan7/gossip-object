@@ -5,6 +5,7 @@ var Scuttlebutt = require('scuttlebutt')
   , clj = require('fun-map')
   , assocInM = clj.assocInM
   , getIn = clj.getIn
+  , binarySearch = require('binary-search')
 
 inherits(Model, Scuttlebutt)
 function Model(opts) {
@@ -151,9 +152,9 @@ m.mergeHistory = function(updates) { var self = this
     transaction.update = update
 
     // now let's figure out where to live
-    var index = binarySearch(self._transactions, byUpdateTimestamp, transaction)
+    var index = ~binarySearch(self._transactions, transaction, byUpdateTimestamp)
     // if there isn't already someone taking that
-    if (index === undefined) return
+    if (index < 0) return
 
     // and see if nobody has obsoleted us yet
     for (freshTransaction$ = index, freshTransaction$len = self._transactions.length; freshTransaction$ < freshTransaction$len; freshTransaction$++) {
@@ -249,27 +250,4 @@ function startsWith(prefix, value) {
     if (prefix[i] !== value[i])
       return false
   return true
-}
-
-function binarySearch(arr, by, value) {
-  var imin = 0
-    , imax = arr.length
-    , cmp = 1
-
-  while (imin < imax) {
-    var imid = imin + (imax - imin >> 1)
-    cmp = by(arr[imid], value)
-
-    if (cmp < 0)
-      imin = imid + 1
-    else if (cmp > 0)
-      imax = imid
-    else
-      break
-  }
-
-  if (cmp < 0)
-    return imax
-  else if (cmp > 0)
-    return imin
 }
