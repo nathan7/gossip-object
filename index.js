@@ -117,85 +117,86 @@ m.get = function(path, fallback) {
   return getIn(this.toJSON(), path, fallback)
 }
 
+m.mergeHistory = function(updates) {
+  for (var update$ = 0, update$len = updates.length; update$ < update$len; update$++) {
+    var update = updates[update$]
+    this.applyUpdate(update)
+  }
+}
+
 m.applyUpdate = function(update) {
   if (!this._validUpdate(update)) return false
 
   var changeListeners = this.listeners('change').length !== 0
     , old = changeListeners && this.toJSON()
 
+  var transaction = update[0]
+    , transaction$
+    , change
+    , change$
+    , change$len
+    , freshTransaction
+    , freshTransaction$
+    , freshTransaction$len
+    , freshChange
+    , freshChange$
+    , freshChange$len
+
+  // let's not get into weird places with mutable state
+  transaction = transaction.slice()
+  // show off where we're from
+  transaction.update = update
+
+  // now let's figure out where to live
+  var index = ~binarySearch(this._transactions, transaction, byUpdateTimestamp)
+  // if there isn't already someone taking that
+  if (index < 0) return false
+
+  // and see if nobody has obsoleted us yet
+  for (freshTransaction$ = index, freshTransaction$len = this._transactions.length; freshTransaction$ < freshTransaction$len; freshTransaction$++) {
+    freshTransaction = this._transactions[freshTransaction$]
+    for (freshChange$ = 0, freshChange$len = freshTransaction.length; freshChange$ < freshChange$len; freshChange$++) {
+      freshChange = freshTransaction[freshChange$]
+      for (change$ = 0, change$len = transaction.length; change$ < change$len; change$++) {
+        change = transaction[change$]
+        if (invalidates(change, freshChange)) {
+          if (--change$len !== 0)
+            transaction.splice(change$--, 1)
+          else
+            return false
+        }
+      }
+    }
+  }
+
+  // well, apparently we're still relevant
   this._cache = null
-  this.mergeHistory([update])
+  this._transactions.splice(index, 0, transaction)
+  freshTransaction = transaction
+
+  // now let's get rid of any updates we supersede
+  processing: for (transaction$ = index - 1; transaction$ >= 0; transaction$--) {
+    transaction = this._transactions[transaction$]
+    for (freshChange$ = freshTransaction.length - 1; freshChange$ >= 0; freshChange$--) {
+      freshChange = freshTransaction[freshChange$]
+      for (change$ = transaction.length - 1; change$ >= 0; change$--) {
+        change = transaction[change$]
+        if (invalidates(change, freshChange)) {
+          if (transaction.length > 1)
+            transaction.splice(change$, 1)
+          else {
+            this._transactions.splice(transaction$, 1)
+            continue processing
+          }
+        }
+      }
+    }
+  }
 
   if (changeListeners)
     this.emit('change', old)
 
   return true
-}
-
-m.mergeHistory = function(updates) { var self = this
-  updates.forEach(function(update) {
-    var transaction = update[0]
-      , transaction$
-      , change
-      , change$
-      , change$len
-      , freshTransaction
-      , freshTransaction$
-      , freshTransaction$len
-      , freshChange
-      , freshChange$
-      , freshChange$len
-
-    // let's not get into weird places with mutable state
-    transaction = transaction.slice()
-    // show off where we're from
-    transaction.update = update
-
-    // now let's figure out where to live
-    var index = ~binarySearch(self._transactions, transaction, byUpdateTimestamp)
-    // if there isn't already someone taking that
-    if (index < 0) return
-
-    // and see if nobody has obsoleted us yet
-    for (freshTransaction$ = index, freshTransaction$len = self._transactions.length; freshTransaction$ < freshTransaction$len; freshTransaction$++) {
-      freshTransaction = self._transactions[freshTransaction$]
-      for (freshChange$ = 0, freshChange$len = freshTransaction.length; freshChange$ < freshChange$len; freshChange$++) {
-        freshChange = freshTransaction[freshChange$]
-        for (change$ = 0, change$len = transaction.length; change$ < change$len; change$++) {
-          change = transaction[change$]
-          if (invalidates(change, freshChange)) {
-            if (--change$len !== 0)
-              transaction.splice(change$--, 1)
-            else
-              return
-          }
-        }
-      }
-    }
-
-    // well, apparently we're still relevant
-    self._transactions.splice(index, 0, transaction)
-    freshTransaction = transaction
-
-    // now let's get rid of any updates we supersede
-    processing: for (transaction$ = index - 1; transaction$ >= 0; transaction$--) {
-      transaction = self._transactions[transaction$]
-      for (freshChange$ = freshTransaction.length - 1; freshChange$ >= 0; freshChange$--) {
-        freshChange = freshTransaction[freshChange$]
-        for (change$ = transaction.length - 1; change$ >= 0; change$--) {
-          change = transaction[change$]
-          if (invalidates(change, freshChange)) {
-            if (transaction.length > 1)
-              transaction.splice(change$, 1)
-            else {
-              self._transactions.splice(transaction$, 1)
-              continue processing
-            }
-          }
-        }
-      }
-    }
-  })
 }
 
 function invalidates(change, freshChange) {
