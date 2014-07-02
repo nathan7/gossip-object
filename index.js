@@ -187,7 +187,7 @@ m.applyUpdate = function(update) {
         change = transaction[change$]
         if (invalidates(change, freshChange)) {
           if (dropped)
-            dropped.push(transaction)
+            dropped.push(change)
           if (transaction.length > 1)
             transaction.splice(change$, 1)
           else {
