@@ -200,9 +200,9 @@ m.applyUpdate = function(update) {
   }
 
   if (dropped) {
-    var added = transaction.slice()
+    var added = freshTransaction.slice()
     added.update = update
-    this.emit('update', { added: transaction, dropped: dropped })
+    this.emit('update', { added: added, dropped: dropped })
   }
 
   if (changeListeners)
