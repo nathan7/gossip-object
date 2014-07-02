@@ -153,8 +153,12 @@ m.applyUpdate = function(update) {
   if (index < 0) return false
 
   var dropped
-  if (this.listeners('update').length !== 0)
+    , droppedUpdates
+  if (this.listeners('update').length !== 0) {
     dropped = []
+    droppedUpdates = []
+  }
+    
 
   // and see if nobody has obsoleted us yet
   for (freshTransaction$ = index, freshTransaction$len = this._transactions.length; freshTransaction$ < freshTransaction$len; freshTransaction$++) {
@@ -191,6 +195,8 @@ m.applyUpdate = function(update) {
           if (transaction.length > 1)
             transaction.splice(change$, 1)
           else {
+            if (droppedUpdates)
+              droppedUpdates.push(transaction.update)
             this._transactions.splice(transaction$, 1)
             continue processing
           }
@@ -202,7 +208,7 @@ m.applyUpdate = function(update) {
   if (dropped) {
     var added = freshTransaction.slice()
     added.update = update
-    this.emit('update', { added: added, dropped: dropped })
+    this.emit('update', { added: added, dropped: dropped, droppedUpdates: droppedUpdates })
   }
 
   if (changeListeners)
