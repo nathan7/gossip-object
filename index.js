@@ -55,7 +55,7 @@ m._validRef = function(ref) {
 
 // change ::= [path]
 //        ||= [path, value]
-//        ||= [path, 'ref', key]
+//        ||= [path, 'ref', ref]
 m._validChange = function validChange(change) {
   return Array.isArray(change)
       && this._validPath(change[0])
