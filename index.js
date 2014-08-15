@@ -245,16 +245,21 @@ m.history = function(sources) {
 }
 
 m._toJSON = function() { var self = this
-  return this._transactions
-    .reduce(function(obj, transaction) {
-      return transaction.reduce(function(obj, change) {
-        return change.length === 1
-          ? obj
-          : change.length === 2
-            ? assocInM(obj, change[0], change[1])
-            : assocInM(obj, change[0], self._deref(change[2]))
-      }, obj)
-    }, {})
+  var obj = {}
+    , transactions = this._transactions
+
+  for (var transaction$ = 0, transaction$len = transactions.length; transaction$ < transaction$len; transaction$++) {
+    var transaction = transactions[transaction$]
+    for (var change$ = 0, change$len = transaction.length; change$ < change$len; change$++) {
+      var change = transaction[change$]
+      if (change.length === 2)
+        assocInM(obj, change[0], change[1])
+      else if (change.length === 3)
+        assocInM(obj, change[0], self._deref(change[2]))
+    }
+  }
+
+  return obj
 }
 
 m.toJSON = function() {
