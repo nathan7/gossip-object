@@ -229,8 +229,14 @@ function invalidates(change, freshChange) {
   // when [a, ..] = b
   // analogous to a deep object set wiping out the values above it in the tree
 
-  return startsWith(freshChange[0], change[0])
-      || startsWith(change[0], freshChange[0])
+  var a = freshChange[0]
+    , b = freshChange[0]
+
+  for (var i = 0, len = Math.max(a.length, b.length); i < len; i++)
+    if (a[i] !== b[i])
+      return false
+
+  return true
 }
 
 
@@ -263,10 +269,3 @@ m.toJSON = function() {
 
 function byUpdateTimestamp(a, b) { return byTimestamp(a.update, b.update) }
 function byTimestamp(a, b) { return a[1] - b[1] || (a[2] > b[2] ? 1 : -1) }
-
-function startsWith(prefix, value) {
-  for (var i = 0, len = prefix.length; i < len; i++)
-    if (prefix[i] !== value[i])
-      return false
-  return true
-}
