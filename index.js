@@ -38,14 +38,15 @@ m._validPath = function(path) {
       && path.every(this._validKey, this)
 }
 
-// value ::= undefined
-//       ||= null
+// value ::= null
 //       ||= boolean
 //       ||= number
 //       ||= string
 m._validValue = function(value) {
   return value === null
-      || typeof value != 'object'
+      || ( value !== undefined
+        && typeof value != 'object'
+         )
 }
 
 // ref is an empty set — it is defined by subclasses, if they support references
